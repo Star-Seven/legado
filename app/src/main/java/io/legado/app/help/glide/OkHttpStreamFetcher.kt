@@ -7,6 +7,7 @@ import com.bumptech.glide.load.Options
 import com.bumptech.glide.load.data.DataFetcher
 import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.util.ContentLengthInputStream
+import com.script.rhino.runScriptWithContext
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.http.CookieManager.cookieJarHeader
@@ -17,7 +18,6 @@ import io.legado.app.help.source.SourceHelp
 import io.legado.app.model.ReadManga
 import io.legado.app.utils.ImageUtils
 import io.legado.app.utils.isWifiConnect
-import com.script.rhino.runScriptWithContext
 import kotlinx.coroutines.Job
 import okhttp3.Call
 import okhttp3.Request
@@ -46,7 +46,7 @@ class OkHttpStreamFetcher(
     private var call: Call? = null
 
     companion object {
-        val failUrl = hashSetOf<String>()
+        private val failUrl = hashSetOf<String>()
     }
 
     override fun loadData(priority: Priority, callback: DataFetcher.DataCallback<in InputStream>) {
@@ -89,6 +89,7 @@ class OkHttpStreamFetcher(
             stream?.close()
         }
         responseBody?.close()
+        coroutineContext.cancel()
         callback = null
     }
 
@@ -113,7 +114,9 @@ class OkHttpStreamFetcher(
         responseBody = response.body
         if (response.isSuccessful) {
             val decodeResult = runScriptWithContext(coroutineContext) {
-                if (manga) {
+                if (ImageUtils.skipDecode(source, !manga)) {
+                    responseBody!!.byteStream()
+                } else if (manga) {
                     ImageUtils.decode(
                         oldUrl.toString(),
                         responseBody!!.bytes(),
